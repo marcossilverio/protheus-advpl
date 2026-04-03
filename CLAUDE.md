@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## GitHub Repository
+
+This project is synchronized automatically with GitHub:
+- **Repository:** [marcossilverio/protheus-advpl](https://github.com/marcossilverio/protheus-advpl)
+- **Auto-sync:** Every file edit or creation triggers an automatic `git add + commit + push` via a PostToolUse hook configured in `.claude/settings.json`
+- **Manual sync:** `cd` to the project directory and run `git add -A && git commit -m "message" && git push`
+
 ## Environment
 
 This is a **TOTVS/Protheus ERP** development workspace using **AdvPL** (Advanced Business Programming Language). Development requires:
