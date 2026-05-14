@@ -1,0 +1,274 @@
+---
+title: ADVPL/TLPP Code Generation
+description: Padroes e templates para gerar codigo ADVPL e TLPP limpo e padronizado para TOTVS Protheus
+---
+
+# ADVPL/TLPP Code Generation
+
+Padroes e templates para gerar codigo ADVPL e TLPP limpo e padronizado para TOTVS Protheus. Cobre User Functions, classes, MVC, APIs REST, Web Services e pontos de entrada.
+
+## Quando Usar
+
+- Criar novas funcoes (User Function, Static Function)
+- Criar classes TLPP com metodos
+- Construir estruturas MVC (Model/View/Controller)
+- Implementar endpoints de API REST
+- Escrever pontos de entrada
+- Criar Web Services SOAP
+- Qualquer criacao de arquivo .prw ou .tlpp
+
+## Convencoes de Nomenclatura
+
+| Elemento | Convencao | Exemplo |
+|----------|-----------|---------|
+| User Function | Prefixo do modulo + nome descritivo | `FATA001` (Faturamento), `COMA100` (Compras) |
+| Static Function | Descritivo, camelCase ou PascalCase | `ValidaCampo`, `GravaRegistro` |
+| Classe (TLPP) | PascalCase, sufixo com proposito | `PedidoService`, `ClienteController` |
+| Metodo | camelCase | `getTotal`, `validarDados` |
+| Variavel Local | Prefixo c/n/d/l/a/o + PascalCase | `cNome`, `nTotal`, `dData`, `lOk`, `aItens`, `oObj` |
+| Parametro | Mesmo da variavel | `cCodCli`, `nQuantidade` |
+| Constante | UPPER_SNAKE_CASE | `MAX_RETRIES`, `DEFAULT_TIMEOUT` |
+
+### Prefixos de Tipo (Notacao Hungara)
+
+| Prefixo | Tipo | Exemplo |
+|---------|------|---------|
+| c | Character/String | `cNome`, `cEndereco` |
+| n | Numeric | `nValor`, `nQuantidade` |
+| d | Date | `dEmissao`, `dVencimento` |
+| l | Logical/Boolean | `lOk`, `lContinua` |
+| a | Array | `aItens`, `aCampos` |
+| o | Object | `oModel`, `oView` |
+| b | Code Block | `bBloco`, `bCondic` |
+| x | Indefinido (any) | `xRetorno`, `xParam` |
+
+### Prefixos de Modulo
+
+| Prefixo | Modulo |
+|---------|--------|
+| COM | Compras |
+| EST | Estoque |
+| FAT | Faturamento |
+| FIN | Financeiro |
+| CTB | Contabilidade |
+| FIS | Fiscal |
+| GFE | Gestao de Frete |
+| HCM | Capital Humano |
+| MNT | Manutencao de Ativos |
+| PCP | Planejamento e Controle de Producao |
+
+## Estrutura Obrigatoria - User Function
+
+Toda User Function DEVE seguir este padrao:
+
+```c
+#Include "TOTVS.CH"
+#Include "TopConn.ch"
+
+/*/{Protheus.doc} FATA001
+Descricao breve da funcao
+@type User Function
+@author Nome do Autor
+@since DD/MM/YYYY
+@version 1.0
+@param cParam1, Caractere, Descricao do parametro
+@return lRet, Logico, Retorno da funcao
+@example
+    u_FATA001("001")
+/*/
+User Function FATA001(cParam1)
+    Local lRet := .T.
+    Local cAlias := "SA1"
+
+    // Salva area de trabalho
+    Local aArea := GetArea()
+
+    Begin Sequence
+
+        // Logica principal aqui
+        DbSelectArea(cAlias)
+        DbSetOrder(1)
+
+        If DbSeek(xFilial(cAlias) + cParam1)
+            // Processamento
+        Else
+            lRet := .F.
+            MsgAlert("Registro nao encontrado")
+        EndIf
+
+    Recover Using oError
+        lRet := .F.
+        Conout("Erro em FATA001: " + oError:Description)
+    End Sequence
+
+    // Restaura area
+    RestArea(aArea)
+
+Return lRet
+```
+
+## Regras de Escopo de Variaveis
+
+| Escopo | Palavra-chave | Visibilidade | Caso de Uso |
+|--------|---------------|-------------|-------------|
+| Local | `Local` | Somente funcao atual | **Sempre preferir** |
+| Static | `Static` | Arquivo PRW atual | Estado compartilhado no arquivo |
+| Private | `Private` | Funcao atual + funcoes chamadas | **Evitar - usar parametros** |
+| Public | `Public` | Toda aplicacao | **Nunca usar em codigo novo** |
+
+**Boa pratica:** Sempre usar `Local`. Passar dados via parametros, nunca via Private/Public.
+
+## Padrao de Tratamento de Erros
+
+```c
+Local oError
+Local bErrorOld := ErrorBlock({|e| oError := e, Break(e)})
+
+Begin Sequence
+
+    // Codigo que pode falhar
+
+Recover Using oError
+    Conout("Erro: " + oError:Description)
+    Conout("Linha: " + cValToChar(oError:GenCode))
+    // Tratar erro ou re-raise
+
+End Sequence
+
+ErrorBlock(bErrorOld)
+```
+
+## Referencia Rapida - Tipos de Codigo
+
+| Tipo | Extensao do Arquivo | Arquivo de Padrao |
+|------|---------------------|-------------------|
+| User Function | .prw | Inline acima |
+| Static Function | .prw | Inline acima (mesmo arquivo da User Function) |
+| Classe TLPP | .tlpp | templates-classes.md |
+| MVC | .prw | patterns-mvc.md |
+| API REST | .prw ou .tlpp | patterns-rest.md |
+| Ponto de Entrada | .prw | patterns-pontos-entrada.md |
+| Web Service SOAP | .prw | patterns-soap.md |
+
+## Regras de Palavra-chave de Funcao (CRITICO)
+
+Codigo de cliente compilado em RPO de cliente **deve** usar `User Function` (ou `Static Function` para helpers internos, ou `Method` de classe para classes TLPP). A palavra-chave `Function` pura e reservada para o RPO core da TOTVS e falha ao compilar em ambientes de cliente.
+
+| Palavra-chave | Valida em RPO de cliente? | Chamavel como | Uso tipico |
+|---------------|---------------------------|---------------|------------|
+| `User Function NAME()` | Sim (sempre) | `u_NAME()` | Qualquer ponto de entrada chamavel pelo cliente, endpoint REST, job, workflow, ponto de entrada |
+| `user function NAME()` | Sim (TLPP, lowercase = mesma coisa) | `u_NAME()` | Endpoints REST TLPP com anotacoes (`@Get`, `@Post`, etc.) |
+| `Static Function NAME()` | Sim | chamada direta dentro do arquivo | Helper privado dentro do mesmo `.prw`/`.tlpp` |
+| `Method NAME() Class XXX` | Sim | `oObj:NAME()` | Classes TLPP |
+| `Function NAME()` (puro) | **NAO — falha em RPO de cliente** | N/A | Reservado apenas para o core da TOTVS |
+
+### REST TLPP com anotacoes
+
+O padrao oficial TOTVS (do `totvs/tlpp-sample-rest/rest-mod02.tlpp`) e `user function` com anotacoes. O plugin adiciona um requisito extra ao sample: uma declaracao obrigatoria de `namespace` (veja "Regras de Namespace TLPP" abaixo).
+
+```c
+#include "tlpp-core.th"
+#include "tlpp-rest.th"
+
+namespace custom.fat.customersapi
+
+@Get("/api/v1/customers")
+User Function getCustomers()
+    // implementacao
+return oRest:setResponse(cData)
+```
+
+A variante baseada em classe (`rest-mod03.tlpp`) tambem e suportada — usa `class ... from LongClassName` com decoradores `@Get/@Post` em metodos. Ambos os padroes compilam em RPOs de cliente, ambos exigem a declaracao de `namespace`. Nunca usa `Function` puro com anotacoes REST TLPP.
+
+## Regras de Namespace TLPP (CRITICO)
+
+Todo arquivo `.tlpp` gerado para codigo de cliente **deve** declarar um `namespace` imediatamente apos os includes. Isso se aplica a endpoints REST, classes, jobs — qualquer geracao TLPP. A ausencia do namespace quebra a consistencia com a referencia de migracao ADVPL→TLPP e cria risco de colisao de nomes entre projetos de cliente.
+
+**Convencao:** `custom.<agrupador>.<servico>` — tudo em lowercase, pontos como separadores, sem underscores.
+
+**Regra de inferencia:**
+- `--module <agrupador>` → `<agrupador>` (lowercase, sem underscores)
+- Nome do arquivo/servico/classe → `<servico>` (lowercase, sem underscores)
+- Resultado: `namespace custom.<agrupador>.<servico>`
+
+**Exemplos:**
+
+| Comando | Namespace inferido |
+|---------|---------------------|
+| `/generate rest Purchase --lang tlpp --module compras` | `namespace custom.compras.purchase` |
+| `/generate class PedidoService --lang tlpp --module fat` | `namespace custom.fat.pedidoservice` |
+| `/generate job JobProcessaNotas --lang tlpp --module fat` | `namespace custom.fat.jobprocessanotas` |
+
+**Regras de formato (todas devem ser respeitadas):**
+
+1. Tudo em lowercase — `custom.compras.purchase`, nunca `Custom.Compras.Purchase`
+2. Separadores com ponto — nunca barras, underscores ou hifens entre segmentos
+3. Sem underscores dentro dos segmentos — `purchaseorder` em vez de `purchase_order`
+4. Apenas prefixo `custom.*` para codigo de cliente (`totvs.protheus.*` e reservado para a TOTVS)
+5. Exatamente uma linha `namespace` por arquivo, apos os includes, antes do cabecalho Protheus.doc
+
+**Quando `--module` esta ausente:** pergunta ao usuario o agrupador durante a Fase de Planejamento. Nunca omite o namespace silenciosamente e nunca inventa um padrao como `custom.geral.xxx`.
+
+**NAO usa `using namespace tlpp.*`:** `tlpp.core`, `tlpp.rest`, `tlpp.log`, `tlpp.data` sao fornecidos pelos includes `.th`. `using namespace` so e valido para consumir **outros namespaces customizados** em arquivos consumidores (ex.: `using namespace custom.fat.pedidoservice`).
+
+## Limites de Tamanho de Identificador (CRITICO)
+
+ADVPL herda um **limite de 10 caracteres** em identificadores (funcoes, metodos, variaveis, campos) do formato legado DBase DBF — apenas os 10 primeiros caracteres sao usados para identificar o simbolo. TLPP remove esse limite, mas **somente quando um `namespace` e declarado**. Gerar um nome que excede o limite produz codigo que ou falha ao compilar ou silenciosamente colide com outro simbolo que compartilha os 10 primeiros caracteres.
+
+| Construcao | Arquivo | Limite efetivo | Razao |
+|------------|---------|----------------|-------|
+| `User Function NAME()` | `.prw` | **8 caracteres** | Limite de 10 menos o prefixo `u_` (2 chars) |
+| `Static Function NAME()` | `.prw` | **10 caracteres** | Sem prefixo — 10 chars completos disponiveis |
+| `Function NAME()` (core) | `.prw` | 10 caracteres | Reservado para o RPO core da TOTVS |
+| Metodo de classe (ADVPL) | `.prw` | 10 caracteres | Excecao: classes herdando de `longnameclass` (workaround legado) |
+| Variavel / parametro | `.prw` / `.tlpp` | 10 caracteres | Mesmo legado DBF |
+| **TLPP com `namespace`** | `.tlpp` | **255 caracteres** | Disponivel a partir do release **12.1.2410** do Protheus — efetivamente ilimitado |
+| TLPP **sem** `namespace` | `.tlpp` | 10 caracteres | Cai no limite ADVPL |
+
+**Regra de geracao (aplicada na Fase de Planejamento):**
+
+1. Se `--lang advpl` (ou `.prw` padrao) e o alvo e `User Function`: **nome deve ter ≤ 8 caracteres**
+2. Se `--lang advpl` e o alvo e `Static Function`: **nome deve ter ≤ 10 caracteres**
+3. Se `--lang tlpp` e um `namespace` esta declarado: **nome deve ter ≤ 255 caracteres** (sem limite pratico)
+4. Se o nome solicitado excede o limite ADVPL, o gerador **nao deve gerar o arquivo**. Em vez disso, apresenta duas opcoes ao usuario no plano:
+   - **(A) Encurtar o nome** — sugere 2-3 alternativas abreviadas (prefixo de modulo + mnemonico, ex.: `ProcessaValidacaoItens` → `FATA100`, `VLDITENS`, `PRCVALIT`)
+   - **(B) Mudar para TLPP com namespace** — pede o agrupador se `--module` estiver ausente e gera `custom.<agrupador>.<servico>`
+
+**Sobre `longnameclass`:** e um mecanismo legado do ADVPL (heranca magica) que historicamente permitia que metodos e propriedades de classe excedessem o limite de 10 chars. **Nao gera codigo novo baseado em `longnameclass`** — TLPP com `namespace` e a substituicao moderna oficialmente suportada. O plugin so reconhece `longnameclass` como excecao durante o code review (BP-010) para evitar falsos positivos em codigo legado.
+
+## Erros Comuns
+
+| Erro | Correcao |
+|------|----------|
+| **Usar palavra-chave `Function` pura em codigo de cliente** | **Sempre usa `User Function` (RPO de cliente exige; invocada como `u_NAME()`)** |
+| **Omitir `namespace` em um arquivo `.tlpp` gerado** | **Sempre declara `namespace custom.<agrupador>.<servico>` apos os includes — infere de `--module` + nome do servico, ou pergunta ao usuario** |
+| **Usar `using namespace tlpp.core` / `tlpp.rest` / `tlpp.log` / `tlpp.data`** | **Remove — esses namespaces vem dos includes `.th` automaticamente** |
+| **`User Function` com mais de 8 caracteres no nome** | **Encurta para ≤ 8 chars (limite ADVPL e 10, menos o prefixo `u_`) ou muda para TLPP com `namespace`** |
+| **`Static Function` com mais de 10 caracteres no nome** | **Encurta para ≤ 10 chars (limite legado ADVPL do DBF) ou muda para TLPP com `namespace` (suporta ate 255 chars)** |
+| Usar Private em vez de Local | Sempre declarar como Local, passar via parametros |
+| Declarar Local dentro de If/While/For | TODAS as declaracoes Local devem estar no topo da funcao, antes de qualquer codigo executavel |
+| Nao salvar/restaurar area (GetArea/RestArea) | Sempre envolver operacoes de DB com save/restore de area |
+| Sem tratamento de erros | Sempre usar Begin Sequence / Recover / End Sequence |
+| Nao fechar RecLock | Sempre usar MsUnlock() apos RecLock() |
+| Filial (branch) hardcoded | Usar xFilial(cAlias) para compatibilidade multi-filial |
+| Include TOTVS.CH faltando | Sempre incluir no minimo: #Include "TOTVS.CH" |
+| Nao validar parametros da funcao | Verificar ValType() e valores vazios no inicio da funcao |
+| Usar metodos inexistentes de JsonObject | Somente usar metodos documentados: New, FromJSON, toJSON, GetNames, HasProperty, etc. |
+| Usar GetSoapFault() em TWsdlManager | NAO existe — usar propriedades cFaultCode, cFaultString |
+| Usar EnableTitleGroup em FWFormView | NAO existe — usar EnableTitleView |
+| **Inventar nome de campo `ALIAS_CAMPO` nao confirmado no SX3** | **Perguntar ao usuario o nome exato ou usar variavel local `cx*` com `// TODO: confirmar campo no SX3`** |
+
+## Arquivos de Suporte
+
+Esta referencia inclui os seguintes arquivos de suporte com templates e padroes detalhados:
+
+- **catalogo-top-50-pes.md** - Catalogo dos top 50 pontos de entrada por modulo (cobertura inicial: 20 PEs em COM, FAT, EST e FIN) com nome, rotina chamadora, momento, PARAMIXB, retorno esperado e link TDN. Usado como **Tier 1 (cache local)** pela skill `tdn-lookup` antes de qualquer busca online
+- **patterns-fwformbrowse.md** - Padroes para telas FWFormBrowse/FWExecView
+- **patterns-jobs.md** - Padroes para jobs batch e processos agendados
+- **patterns-mvc.md** - Padroes para estruturas MVC (Model/View/Controller)
+- **patterns-pontos-entrada.md** - Padroes para pontos de entrada do Protheus (consulta o catalogo acima primeiro, depois cai para `tdn-lookup`)
+- **patterns-rest.md** - Padroes para endpoints de API REST
+- **patterns-soap.md** - Padroes para Web Services SOAP
+- **patterns-treport.md** - Padroes para relatorios TReport
+- **patterns-workflow.md** - Padroes para processos de workflow
+- **templates-classes.md** - Templates para classes TLPP

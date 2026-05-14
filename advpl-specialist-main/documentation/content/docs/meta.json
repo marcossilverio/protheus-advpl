@@ -1,0 +1,24 @@
+{
+  "title": "Documentacao",
+  "pages": [
+    "---Inicio---",
+    "index",
+    "instalacao",
+    "primeiro-comando",
+    "exemplos",
+    "plugins-complementares",
+    "---Comandos---",
+    "comandos",
+    "---Agentes---",
+    "agentes",
+    "---Skills---",
+    "skills",
+    "---Referencia---",
+    "referencia",
+    "---Processos de Negocio---",
+    "processos",
+    "---Extras---",
+    "changelog",
+    "contribuicao"
+  ]
+}

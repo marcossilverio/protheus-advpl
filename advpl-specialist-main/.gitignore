@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Project local files
+/docs/
+linkedin-post.txt
+
+# Playwright MCP
+.playwright-mcp/
+
+# Screenshots
+*.png
+!documentation/public/og-image.png

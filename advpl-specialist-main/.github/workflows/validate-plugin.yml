@@ -1,0 +1,148 @@
+name: Validate Plugin
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate JSON syntax
+        run: |
+          set -e
+          for f in .claude-plugin/*.json; do
+            echo "Validating $f"
+            jq empty "$f"
+          done
+
+      - name: Validate version alignment
+        run: |
+          set -e
+          PLUGIN_VER=$(jq -r '.version' .claude-plugin/plugin.json)
+          MARKET_VER=$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)
+          MARKET_ROOT_VER=$(jq -r '.version // empty' .claude-plugin/marketplace.json)
+          SITE_VER=$(grep -oE "PLUGIN_VERSION = 'v[0-9]+\.[0-9]+\.[0-9]+'" documentation/app/page.tsx | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -1)
+          README_VER=$(grep -oE "version-[0-9]+\.[0-9]+\.[0-9]+-blue" README.md | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -1)
+          INDEX_VER=$(grep -oE "version-[0-9]+\.[0-9]+\.[0-9]+-blue" documentation/content/docs/index.mdx | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -1)
+          echo "plugin.json:             $PLUGIN_VER"
+          echo "marketplace.json[0]:     $MARKET_VER"
+          echo "marketplace.json root:   $MARKET_ROOT_VER"
+          echo "documentation landing:   $SITE_VER"
+          echo "README.md badge:         $README_VER"
+          echo "docs index.mdx badge:    $INDEX_VER"
+          if [ "$PLUGIN_VER" != "$MARKET_VER" ]; then
+            echo "ERROR: version mismatch between plugin.json and marketplace.json plugins[0]"
+            exit 1
+          fi
+          if [ -n "$MARKET_ROOT_VER" ] && [ "$MARKET_ROOT_VER" != "$PLUGIN_VER" ]; then
+            echo "ERROR: root version in marketplace.json mismatches plugin.json"
+            exit 1
+          fi
+          if [ -n "$SITE_VER" ] && [ "$SITE_VER" != "$PLUGIN_VER" ]; then
+            echo "ERROR: documentation/app/page.tsx PLUGIN_VERSION ($SITE_VER) mismatches plugin.json ($PLUGIN_VER)"
+            exit 1
+          fi
+          if [ -n "$README_VER" ] && [ "$README_VER" != "$PLUGIN_VER" ]; then
+            echo "ERROR: README.md version badge ($README_VER) mismatches plugin.json ($PLUGIN_VER)"
+            exit 1
+          fi
+          if [ -n "$INDEX_VER" ] && [ "$INDEX_VER" != "$PLUGIN_VER" ]; then
+            echo "ERROR: documentation/content/docs/index.mdx version badge ($INDEX_VER) mismatches plugin.json ($PLUGIN_VER)"
+            exit 1
+          fi
+
+      - name: Validate YAML frontmatter
+        run: |
+          FAIL=0
+          for f in commands/*.md agents/*.md; do
+            if ! head -1 "$f" | grep -q "^---$"; then
+              echo "ERROR: $f missing frontmatter opener"
+              FAIL=1
+              continue
+            fi
+            FM_END=$(awk '/^---$/{c++; if(c==2){print NR; exit}}' "$f")
+            if [ -z "$FM_END" ]; then
+              echo "ERROR: $f frontmatter not closed"
+              FAIL=1
+              continue
+            fi
+            if ! sed -n "2,$((FM_END-1))p" "$f" | python3 -c "import sys, yaml; yaml.safe_load(sys.stdin)" 2>/dev/null; then
+              echo "ERROR: $f has invalid YAML frontmatter"
+              FAIL=1
+            fi
+          done
+          exit $FAIL
+
+      - name: Validate agent frontmatter fields
+        run: |
+          FAIL=0
+          for f in agents/*.md; do
+            for field in description tools model; do
+              if ! sed -n "/^---$/,/^---$/p" "$f" | grep -q "^${field}:"; then
+                echo "ERROR: $f missing required frontmatter field: $field"
+                FAIL=1
+              fi
+            done
+          done
+          exit $FAIL
+
+      - name: Validate command frontmatter fields
+        run: |
+          FAIL=0
+          for f in commands/*.md; do
+            for field in description allowed-tools; do
+              if ! sed -n "/^---$/,/^---$/p" "$f" | grep -q "^${field}:"; then
+                echo "ERROR: $f missing required frontmatter field: $field"
+                FAIL=1
+              fi
+            done
+          done
+          exit $FAIL
+
+      - name: Validate skill reference.md size (<= 500 lines)
+        run: |
+          FAIL=0
+          for f in skills/*/reference.md; do
+            [ -f "$f" ] || continue
+            LINES=$(wc -l < "$f")
+            if [ "$LINES" -gt 500 ]; then
+              echo "ERROR: $f has $LINES lines (max 500). Move content to supporting files."
+              FAIL=1
+            fi
+          done
+          exit $FAIL
+
+      - name: Validate shell scripts syntax
+        run: |
+          set -e
+          for f in hooks/session-start hooks/lib/*.sh; do
+            [ -f "$f" ] || continue
+            bash -n "$f" || { echo "ERROR: $f has syntax errors"; exit 1; }
+          done
+
+      - name: Check internal links
+        run: |
+          FAIL=0
+          for f in commands/*.md agents/*.md skills/*/reference.md; do
+            [ -f "$f" ] || continue
+            DIR=$(dirname "$f")
+            while IFS= read -r link; do
+              [ -z "$link" ] && continue
+              TARGET="$DIR/$link"
+              if [ ! -f "$TARGET" ]; then
+                echo "BROKEN LINK in $f: $link -> $TARGET"
+                FAIL=1
+              fi
+            done < <(grep -oE '\.\./[a-zA-Z0-9_/.-]+\.md' "$f" || true)
+          done
+          exit $FAIL

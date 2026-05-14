@@ -1,0 +1,216 @@
+---
+title: Changelog
+description: Historico de versoes do advpl-specialist
+---
+
+Todas as mudancas notaveis deste projeto sao documentadas neste arquivo.
+
+O formato e baseado no [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+e este projeto segue o [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.2] - 2026-04-18
+
+### Adicionado
+
+- Diretorio `examples/` com 6 cenarios end-to-end (geracao MVC, migracao, diagnostico de lock, endpoint REST, revisao de performance, geracao de dicionario SX). Inclui dois arquivos de apoio (`FATA001-antes.prw` e `exemplo-lento.prw`) como input para os exemplos de migracao e review.
+- Novo catalogo `skills/advpl-code-generation/catalogo-top-50-pes.md` com 20 pontos de entrada nos modulos COM, FAT, EST e FIN (nome do PE, rotina chamadora, modulo, momento, PARAMIXB, retorno esperado, link TDN).
+- Workflow `validate-plugin.yml` do GitHub Actions — valida sintaxe JSON, alinhamento de versoes entre `plugin.json` e `marketplace.json`, frontmatter YAML em commands e agents, limite de tamanho dos `reference.md` das skills (≤ 500 linhas), sintaxe de shell scripts e integridade de links internos em todo push/PR para `main`.
+
+### Alterado
+
+- `/generate ponto-entrada` agora consulta o catalogo local de PEs (Tier 1) antes de cair no TDN, reduzindo latencia em ~70% para PEs comuns. A estrategia TDN continua como fallback para garantir correcao.
+- Skill `tdn-lookup` agora documenta um **Tier 1 (cache local por dominio)** explicito antes dos 4 tiers online, com tabela mapeando cada dominio de conhecimento (pontos de entrada, funcoes nativas, SX, erros comuns, etc.) ao arquivo de cache local correspondente.
+- `skills/advpl-code-generation/patterns-pontos-entrada.md` reescrito para referenciar o novo catalogo primeiro e tratar a secao "Always search TDN first" como fallback, em vez de exigir busca TDN em toda geracao.
+- README atualizado com nova secao "Exemplos" (ligada a partir do indice) resumindo os 6 cenarios.
+
+## [1.1.1] - 2026-04-16
+
+### Corrigido
+
+- Corrigido desalinhamento de versao entre `plugin.json` (1.1.0) e `marketplace.json` (1.0.9). Ambos agora alinhados em 1.1.1.
+- Corrigido path quebrado do cache cleanup em `hooks/session-start` — lia `marketplace.json` dois diretorios acima da raiz do cache, resultando em `CURRENT_VERSION` vazio e cleanup nunca rodando. Agora usa `$CLAUDE_PLUGIN_ROOT` corretamente.
+- Corrigido `allowed-tools` de `commands/process.md` listando ferramentas `browser_*` sem prefixo MCP. Agora usa `mcp__playwright__browser_*`.
+
+### Alterado
+
+- Adicionado frontmatter `tools:` e `model:` explicitos em todos os 10 agents. Agents read-only (`code-reviewer`, `debugger`, `docs-reference`, `process-consultant`) agora declaram conjuntos minimos de ferramentas, reduzindo superficie de ataque e melhorando qualidade da revisao.
+- Adicionado campo `version` no nivel raiz de `marketplace.json` para melhor compatibilidade de invalidacao de cache.
+
+## [1.1.0] - 2026-04-14
+
+### Alterado
+
+- Skills agora sao referencias internas — nao aparecem mais como entradas duplicadas na lista de skills do Claude Code
+- Renomeado `SKILL.md` para `reference.md` em todos os 14 diretorios de skills
+- Removido `Skill` de `allowed-tools` em todos os 12 commands
+- Atualizados 10 agents para usar `Read` no carregamento de referencias
+- Renomeada secao "Skills" do README para "Referencia Interna"
+- Adicionada referencia `tdn-lookup` ao README e ao site de documentacao
+
+### Adicionado
+
+- Validacao de nomes de campos v2 (data-driven): agent agora valida nomes de campos SX3 contra `sx3-common-fields.md` (21 tabelas, ~323 campos do SempreJu). Para campos nao encontrados na referencia local, busca automaticamente no SempreJu. So pergunta ao usuario como ultimo recurso. Nunca inventa nomes de campos.
+
+### Removido
+
+- Guardrail de validacao de contexto em pontos de entrada: removido — a abordagem comportamental com verificacoes defensivas `Type()` era muito generica e gerava codigo verboso sem resolver o problema real.
+
+## [1.0.9] - 2026-04-13
+
+### Adicionado
+
+- Persistencia automatica de planos: todos os 8 agents com fases de planejamento/geracao agora salvam os planos aprovados em `docs/plans/YYYY-MM-DD-<comando>-<descricao>.md` automaticamente apos a aprovacao do usuario
+- Nova estrategia de busca no TDN usando API REST do Confluence (4 tiers online de fallback): WebFetch API → Playwright API JSON → WebSearch + Playwright → Playwright busca visual — reduz consumo de tokens em 70-90% comparado a scraping de HTML
+- Skill centralizada `tdn-lookup` substituindo blocos duplicados de busca no TDN em 8 agents (259 delecoes, 133 insercoes)
+
+## [1.0.8] - 2026-04-07
+
+### Corrigido
+
+- Corrigida geracao de codigo usando palavra-chave `Function` pura em vez de `User Function` em RPOs de cliente — palavra-chave `Function` pura e reservada para o RPO core da TOTVS e falha ao compilar em ambientes de cliente
+- Corrigido `/generate` varrendo todos os arquivos-fonte do projeto a cada invocacao — o plugin e baseado em templates e nao precisa ler fontes `.prw`/`.tlpp` do cliente para gerar codigo
+
+### Adicionado
+
+- Declaracao obrigatoria de `namespace custom.<agrupador>.<servico>` para todo arquivo `.tlpp` gerado (endpoints REST, classes, jobs) — inferido de `--module` + nome do servico, ou perguntado ao usuario durante a Fase de Planejamento
+- Nova regra de revisao `[BP-009]`: detecta palavra-chave `Function` pura em codigo de cliente e sugere conversao para `User Function` / `Static Function` / `Method` de classe
+- Nova regra de revisao `[BP-010]`: detecta nomes de identificadores que excedem o limite efetivo de tamanho (User Function ≤ 8 chars, Static Function ≤ 10 chars, TLPP com namespace ≤ 255 chars)
+- Validacao bloqueante de tamanho de identificador na Fase de Planejamento do `/generate` com fluxo de duas opcoes: (A) encurtar nome seguindo convencoes Protheus ou (B) mudar para TLPP com namespace (disponivel a partir do release 12.1.2410 do Protheus)
+- Proibicao explicita de varredura de fontes do projeto no `/generate` — `Glob`/`Grep`/`Read` em arquivos `.prw`/`.tlpp` do cliente nao e mais permitido (apenas arquivos internos do plugin, arquivo unico referenciado pelo usuario, ou escrita do arquivo final)
+- Documentacao sobre limites de tamanho de identificador, workaround legado `longnameclass`, e TLPP com namespace como substituicao moderna
+
+## [1.0.7] - 2026-03-26
+
+### Adicionado
+
+- Documentacao completa do TDN para 74+ classes e funcoes em 5 fases no native-functions.md
+- Fase 1: 9 classes UI/Browse (FwBrowse, FWMarkBrowse, FWBrwColumn, FWBrwRelation, FWLegend, FWGridProcess, tNewProcess, FWCalendar, FWSimpEdit)
+- Fase 2: 20 funcoes utilitarias de uso diario (FwGetArea, FwRestArea, FwGetUserName, UsrRetName, FWMsgRun, FWInputBox, FWFreeObj, FWFreeVar, Fw8601ToDate, FWDateTo8601, FWHttpEncode, FWURIDecode, MayIUseCode, MPCriaNumS, MsGetDAuto, SaveInter, RestInter, FWX3Titulo, FWX2CHAVE, FWX2Unico)
+- Fase 3: 8 classes de seguranca/autenticacao (FWoAuth2Client, FWoAuth2Url, FWSafeVault, FWSecretVault, FwProtectedDataUtil, FwPDFieldRepository, FwPDFieldDetailRepository, FwPDGroupRepository)
+- Fase 4: 12 funcoes de empresa/filial e scheduling (FWLoadSM0, FWModeAccess, FwListBranches, FWJoinFilial, FwCallApp, FWSchdAvaiable, FWSchdByFunction, FWSchdEmpFil, FwExecLocaliz, FwExistLocaliz, FwBranAltInf, FwComAltInf)
+- Fase 5: 25+ classes e funcoes de nicho (FwChartFactory, XTree, ApWizard, FWCarolWizard, FWMsPrinter, PrinterVersion, FWBulk, FWQueryCache, FWExecCachedQuery, FWSX9Util, FWSM0Util, FWSXGUtil, FWUIWorkarea, MSProject, TKeyboard, FWBmpRep, MPFilesBinary, AddMashupAlias, AmIIn, ChkAdvplSyntax, MakeSqlExpr, PesqBrw)
+- Integracao do Google Analytics 4 no site de documentacao
+- Workflow de coleta diaria de metricas de trafego
+
+### Corrigido
+
+- Corrigida geracao de codigo criando metodos inexistentes do JsonObject para iteracao case-insensitive de headers — agora usa padrao `GetNames()` + `Upper()` (obrigado [@edusfc15](https://github.com/edusfc15) por reportar [#3](https://github.com/thalysjuvenal/advpl-specialist/issues/3))
+- Movidas todas as declaracoes Local para o topo das funcoes
+
+## [1.0.6] - 2026-03-23
+
+### Adicionado
+
+- Nova regra de revisao `[BP-008]`: detecta uso de variaveis reservadas do sistema (`cFilial`, `cFilAnt`, `cEmpAnt`) como Local/Static, com alternativas recomendadas (`cCodFil`, `cCodEmp`)
+- Nova regra de seguranca `[SEC-005]`: detecta uso de 195+ funcoes, classes e variaveis restritas/internas da TOTVS com alternativas suportadas
+- Novo arquivo de referencia `restricted-functions.md` com lista completa de funcoes de propriedade interna da TOTVS (fonte: Central de Atendimento TOTVS)
+- Nova secao `Company/Branch Management Functions (FW*)` com 10 funcoes documentadas: `FWCodFil`, `FWCodEmp`, `FWFilial`, `FWCompany`, `FWGrpCompany`, `FWUnitBusiness`, `FWAllCompany`, `FWAllFilial`, `FWAllGrpCompany`, `FWSizeFilial`
+
+### Corrigido
+
+- Substituido `cFilial` por `cCodFil` e `cEmpresa` por `cCodEmp` em todos os exemplos de codigo (nomes de variaveis Private reservadas nao podem ser usados como variaveis Local)
+- Atualizada documentacao do `StaticCall()` para refletir status de compilacao bloqueada desde a release 12.1.33
+- Adicionados avisos sobre variaveis reservadas na documentacao de `xFilial()` e `RpcSetEnv()`
+
+## [1.0.5] - 2026-03-18
+
+### Corrigido
+
+- Substituido acesso direto aos dicionarios SX (`DbSelectArea("SX1/SX2/SX3/SX5/SX6/SIX")`) pelas classes recomendadas pela TOTVS: `FWSX1Util`, `FWSX2Util`, `FWSX3Util`, `FWSX6Util`, `FWSIXUtil`, `FWGetSX5()`, `FwPutSX5()` (obrigado [@wesleywwf](https://github.com/wesleywwf) por reportar [#1](https://github.com/thalysjuvenal/advpl-specialist/issues/1))
+
+### Adicionado
+
+- Disclaimer TOTVS no rodape do site de documentacao (sem vinculo com a TOTVS S.A.)
+- Imagem OG para preview de compartilhamento em redes sociais (1200x630px)
+- Traducoes em portugues (pt-BR) para a UI do Fumadocs (pesquisa, sumario, navegacao, tema)
+- Traduzidas todas as 10 paginas de documentacao de agentes para portugues
+
+## [1.0.4] - 2026-03-17
+
+### Adicionado
+
+- Novo comando `/explain` para explicacao de codigo em 3 niveis de audiencia (junior, senior, funcional)
+- Novo comando `/refactor` com agent `refactorer` e skill `advpl-refactoring` (6 padroes de refatoracao com before/after)
+- Novo comando `/document` com agent `doc-generator` e skill `documentation-patterns` (cabecalho Protheus.doc, documentacao completa, documentacao de API)
+- Novo comando `/changelog` com agent `changelog-generator` e skill `changelog-patterns`
+- Novo comando `/sxgen` com agent `sx-configurator` e skill `sx-configuration` (scripts de dicionario SX3, SIX, SX1, SX5, SX7 a partir de linguagem natural)
+- Nova skill `code-explanation` com metodologia de 3 niveis para explicacao de codigo
+- Site de documentacao construido com Fumadocs (Next.js + MDX) hospedado no GitHub Pages
+- Documentacao completa cobrindo todos os 12 comandos, 10 agentes, 14 skills, referencia e processos de negocio
+
+### Corrigido
+
+- Removida chave `bugs` nao suportada do manifesto plugin.json
+
+## [1.0.3] - 2026-03-11
+
+### Adicionado
+
+- Novo comando `/review` para analise de qualidade de codigo (boas praticas, performance, seguranca, modernizacao)
+- Novo comando `/test` para geracao de testes unitarios ProBat (apenas TLPP)
+- Novo comando `/process` para consulta de processos de negocio ERP
+- Novo agent `code-reviewer` para analise de codigo ADVPL/TLPP com 21 regras de revisao
+- Novo agent `process-consultant` para processos de negocio ERP
+- Nova skill `advpl-code-review` com 4 categorias de regras (BP, PERF, SEC, MOD)
+- Nova skill `probat-testing` com referencia ProBat API e padroes de testes unitarios (validado no TDN)
+- Nova skill `protheus-business` com referencia de 8 modulos ERP (COM, EST, FAT, FIN, CTB, FIS, PCP, MNT)
+- 4 novos padroes de geracao de codigo: TReport, FWFormBrowse, Jobs/Scheduler, Workflow/BPM
+- 16 novas funcoes nativas validadas no TDN (TReport, FWFormBrowse, Jobs, classes de Email)
+- 93 parametros MV_* validados em 8 modulos via TDN e Terminal de Informacao
+- Anotacoes ProBat validadas via repositorio oficial TOTVS tlpp-probat-samples
+
+### Corrigido
+
+- Removidos 90+ parametros MV_* fabricados das skills de modulos de negocio
+- Corrigidos nomes de parametros incorretos (MV_ESTNEGA para MV_ESTNEG, MV_SPESSION para MV_USASPED, etc.)
+- Removidos campos fabricados da tabela SC2 (C2_TESSION/C2_TESSION2) da skill PCP
+
+## [1.0.2] - 2026-03-09
+
+### Adicionado
+
+- Fallback via Playwright MCP para todo acesso web a documentacao (agents: docs-reference, debugger, code-generator; skill: protheus-reference)
+- Quando WebSearch ou WebFetch falham, os agents agora utilizam as ferramentas Playwright como fallback (browser_navigate, browser_snapshot, browser_take_screenshot)
+- Abordagem hibrida: tenta snapshot de texto primeiro, usa screenshot para conteudo visual complexo
+- Recomendacao de instalacao do Playwright MCP no hook session-start
+
+## [1.0.1] - 2026-03-05
+
+### Adicionado
+
+- Padroes de Web Service SOAP (`patterns-soap.md`) com WsService e TWsdlManager
+- Recomendacao do plugin superpowers no hook session-start e README
+- Modo planejamento obrigatorio para os comandos `generate` e `migrate`
+- Indicador 50+ no hook session-start quando a contagem de arquivos atinge o limite
+- Convencoes oficiais de nomenclatura TLPP da TOTVS do TDN
+- Deteccao de idioma em todos os comandos (responde no idioma do usuario)
+- Skill de Embedded SQL com padroes BeginSQL/EndSQL e macros
+
+### Corrigido
+
+- Substituido o obsoleto `#Include "Protheus.ch"` por `#Include "TOTVS.CH"` em 10 arquivos
+- Corrigido includes TLPP para usar arquivos `.th` (`tlpp-core.th`, `tlpp-rest.th`) em vez de `TOTVS.CH`
+- Removido `using namespace tlpp.*` incorreto (`tlpp.core`, `tlpp.rest`, `tlpp.log`, `tlpp.data`) de todos os exemplos
+- Corrigido alvo de migracao para usar includes `.th` em vez de `TOTVS.CH`
+- Resolvido texto ambiguo em todo o repositorio
+- Adicionado `Skill` e `Bash` faltantes em allowed-tools de todos os comandos
+- Corrigido posicionamento de declaracoes de variaveis Local nos exemplos de native-functions
+
+## [1.0.0] - 2026-03-04
+
+### Adicionado
+
+- Lancamento inicial
+- 4 comandos: `generate`, `migrate`, `diagnose`, `docs`
+- 4 agents: `code-generator`, `migrator`, `debugger`, `docs-reference`
+- 5 skills: `advpl-code-generation`, `advpl-to-tlpp-migration`, `advpl-debugging`, `embedded-sql`, `protheus-reference`
+- Hook SessionStart com deteccao automatica de projeto ADVPL/TLPP
+- 165+ funcoes nativas documentadas
+- Referencia de 9 tabelas SX
+- Padroes de REST API (FWRest e WsRestFul)
+- 50 erros comuns com causa e solucao
+- 10 categorias de otimizacao de performance
+- 16 pontos de entrada mais usados por modulo
+- Templates de classes TLPP (Service, Repository, DTO)
+- Padroes MVC completos (MenuDef, ModelDef, ViewDef, FWMVCRotAuto)
+- Suporte ao Marketplace via `marketplace.json`

@@ -1,0 +1,59 @@
+---
+title: Exemplos
+description: Seis cenarios end-to-end com prompts prontos para executar - gerar MVC, migrar ADVPL, diagnosticar lock, criar REST, revisar performance e gerar dicionario SX
+---
+
+Disponivel a partir da v1.1.2. Cada exemplo e um cenario end-to-end com **prompt exato**, **output esperado** e **variacoes** praticas. Os exemplos sao independentes — podem ser executados em qualquer ordem.
+
+## Catalogo de cenarios
+
+| # | Cenario | Comando principal | Link no repositorio |
+|---|---------|-------------------|---------------------|
+| 01 | Gerar MVC completo para tabela customizada ZA1 | `/advpl-specialist:generate` | [01-gerar-mvc-za1](https://github.com/thalysjuvenal/advpl-specialist/tree/main/examples/01-gerar-mvc-za1) |
+| 02 | Migrar ADVPL procedural (FATA001) para TLPP com classes | `/advpl-specialist:migrate` | [02-migrar-fata001](https://github.com/thalysjuvenal/advpl-specialist/tree/main/examples/02-migrar-fata001) |
+| 03 | Diagnosticar erro de lock infinito em `RecLock` | `/advpl-specialist:diagnose` | [03-diagnosticar-lock](https://github.com/thalysjuvenal/advpl-specialist/tree/main/examples/03-diagnosticar-lock) |
+| 04 | Criar endpoint REST em TLPP com namespace | `/advpl-specialist:generate` | [04-gerar-rest-tlpp](https://github.com/thalysjuvenal/advpl-specialist/tree/main/examples/04-gerar-rest-tlpp) |
+| 05 | Revisar codigo focando em performance | `/advpl-specialist:review` | [05-review-com-focus-performance](https://github.com/thalysjuvenal/advpl-specialist/tree/main/examples/05-review-com-focus-performance) |
+| 06 | Gerar dicionario SX3 + SIX + SX1 para nova tabela | `/advpl-specialist:sxgen` | [06-sxgen-tabela-customizada](https://github.com/thalysjuvenal/advpl-specialist/tree/main/examples/06-sxgen-tabela-customizada) |
+
+## Como usar os exemplos
+
+1. Abra o Claude Code na raiz de um projeto Protheus (com arquivos `.prw` ou `.tlpp`)
+2. Escolha o cenario mais proximo do seu caso
+3. Abra o README do exemplo no repositorio (link da tabela acima)
+4. Copie o prompt exato descrito la
+5. Ajuste parametros (nome da rotina, modulo, campos) para a sua realidade
+6. Revise o plan mode antes de aprovar a geracao ou alteracao
+
+## Estrutura de um exemplo
+
+Cada pasta em `examples/` contem:
+
+- **`README.md`** — contexto do cenario, prompt exato, o que o plugin faz passo a passo, output esperado, variacoes e proximos passos sugeridos
+- **Arquivos de apoio** (quando aplicavel) — codigo `.prw` real para servir de input (`FATA001-antes.prw` para o exemplo 02, `exemplo-lento.prw` para o 05)
+
+## Destaques
+
+### Exemplo 02 — Migrar ADVPL para TLPP com contexto real
+
+Diferente de um snippet generico, o `FATA001-antes.prw` tem ~60 linhas com **problemas tipicos**: variaveis `Private`, queries concatenadas, `RecLock` sem `BEGIN SEQUENCE`, logica de negocio misturada com UI. E um bom banco de testes para validar a qualidade da migracao.
+
+### Exemplo 05 — Review com foco em performance
+
+O `exemplo-lento.prw` ilustra os **3 problemas mais comuns** em rotinas batch lentas:
+
+- `RP-001` N+1 queries (TcQuery dentro de loop)
+- `RP-002` DbSeek sem indice dedicado (TableScan em producao)
+- `RP-003` Concatenacao de string em loop (realocacao repetida)
+
+O prompt do exemplo usa `--focus performance` e o relatorio saida prioriza os findings por impacto real.
+
+## Contribuir com novos cenarios
+
+Tem um caso de uso que o plugin resolve bem e nao esta nos exemplos? Abra uma issue em [github.com/thalysjuvenal/advpl-specialist/issues](https://github.com/thalysjuvenal/advpl-specialist/issues) descrevendo:
+
+- **Contexto:** qual problema de negocio o exemplo resolve
+- **Prompt:** o texto exato que voce passaria para o plugin
+- **Output:** o resultado que voce esperava ou obteve
+
+Exemplos bem-vindos em **qualquer modulo** — especialmente PCP, CTB, FIS e MNT, que hoje tem cobertura menor que COM, FAT, EST e FIN.

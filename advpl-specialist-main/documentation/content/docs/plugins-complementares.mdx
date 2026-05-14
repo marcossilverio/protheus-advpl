@@ -1,0 +1,148 @@
+---
+title: Plugins complementares
+description: Outros plugins do Claude Code e MCPs que potencializam o advpl-specialist no desenvolvimento diario Protheus
+---
+
+O `advpl-specialist` foi desenhado para trabalhar em conjunto com outros plugins do Claude Code. Esta pagina lista as recomendacoes com maior sinergia — quais comandos pareiam com cada um e em que momento do fluxo eles entram.
+
+## Alto valor: combo pratico diario
+
+Estes quatro plugins + o `advpl-specialist` cobrem ~90% dos cenarios de desenvolvimento ADVPL/TLPP.
+
+### superpowers
+
+**Quando usar:** antes de features grandes, durante debugging e antes de dar commit.
+
+| Skill do superpowers | Pareamento natural |
+|---------------------|--------------------|
+| `brainstorming` | Antes de `/advpl-specialist:generate` em features com multiplas rotinas ou integracoes |
+| `writing-plans` | Quando a customizacao envolve mudancas em mais de 3 arquivos `.prw/.tlpp` |
+| `systematic-debugging` | Em conjunto com `/advpl-specialist:diagnose` — obriga a formular hipotese antes de propor fix |
+| `test-driven-development` | Antes de rodar `/advpl-specialist:test` — escreve o teste ProBat primeiro |
+| `verification-before-completion` | Antes de compilar o `.prw` gerado — valida que a mudanca faz o que deveria |
+
+Instalacao (marketplace oficial Anthropic):
+
+```bash
+/plugin marketplace add anthropics/claude-plugins-official
+/plugin install superpowers@claude-plugins-official
+```
+
+### context-mode
+
+**Quando usar:** em **todo** projeto Protheus, o tempo todo.
+
+Projetos Protheus reais inflam o contexto muito rapido:
+
+- Logs do AppServer com stack traces de ADVPL
+- Arquivos `.prw` grandes (rotinas legadas com 2000+ linhas)
+- Queries com `BeginSQL` e multiplos JOINs
+- Listagens de dicionario SX com centenas de campos
+
+Com `context-mode`, ferramentas como `ctx_batch_execute` e `ctx_execute_file` processam tudo num sandbox isolado e devolvem apenas o resumo para o contexto da conversa — evita estouro e mantem a sessao produtiva por muito mais tempo.
+
+Instalacao:
+
+```bash
+/plugin marketplace add mksglu/context-mode
+/plugin install context-mode@context-mode
+```
+
+### error-memory
+
+**Quando usar:** sempre que `/advpl-specialist:diagnose` resolver um erro **nao trivial**.
+
+Erros ADVPL/TLPP raros (deadlock entre PEs, `Function not found` por RPO fora de sincronia, erro de compilacao obscuro em TLPP com namespace) demoram pra diagnosticar da primeira vez. Loguar a solucao via `/error-memory:log` economiza 30-60 minutos quando o mesmo erro acontecer em outro projeto ou dali a meses.
+
+Instalacao (marketplace mwguerra):
+
+```bash
+/plugin marketplace add mwguerra/claude-code-plugins
+/plugin install error-memory@mwguerra-marketplace
+```
+
+### taskmanager
+
+**Quando usar:** para rastrear a execucao dos planos que o `advpl-specialist` persiste em `docs/plans/`.
+
+Os comandos `/advpl-specialist:generate`, `/migrate` e `/refactor` salvam o plano aprovado em `docs/plans/YYYY-MM-DD-<comando>-<descricao>.md`. O taskmanager transforma esses planos em tasks executaveis com dependencias — util quando a customizacao atravessa varias sessoes ou quando ha mais de um desenvolvedor envolvido.
+
+Instalacao (mesmo marketplace do `error-memory`):
+
+```bash
+# Se ainda nao adicionou o marketplace da mwguerra:
+/plugin marketplace add mwguerra/claude-code-plugins
+
+/plugin install taskmanager@mwguerra-marketplace
+```
+
+## Valor situacional
+
+### prd-builder
+
+**Quando usar:** **antes** de `/advpl-specialist:generate` em features ADVPL grandes com requisitos funcionais detalhados.
+
+Exemplos:
+
+- Novo modulo customizado (ex.: "modulo de controle de visitas tecnicas")
+- Integracao Protheus ↔ sistema externo (SOAP, REST, EDI)
+- Refatoracao com regras de negocio que mudam em simultaneo
+
+Fluxo: `/prd-builder:prd` monta o documento de requisitos em entrevista estruturada, `/advpl-specialist:generate` consome o PRD como contexto e gera codigo alinhado ao escopo.
+
+Instalacao (marketplace mwguerra):
+
+```bash
+# Se ainda nao adicionou o marketplace da mwguerra:
+/plugin marketplace add mwguerra/claude-code-plugins
+
+/plugin install prd-builder@mwguerra-marketplace
+```
+
+### docs-specialist
+
+**Quando usar:** quando a documentacao do projeto vive em sistemas externos (Confluence, GitBook, Notion) e voce precisa manter sincronia com o codigo ADVPL/TLPP.
+
+O `docs-specialist` faz **drift detection** — compara o que esta documentado com o que o codigo realmente faz, apontando divergencias antes que virem problema em auditoria ou handover.
+
+Para documentacao interna no proprio repositorio, o `/advpl-specialist:document` ja cobre (gera cabecalho Protheus.doc e documentacao de API); este plugin e util em camadas acima.
+
+Instalacao (marketplace mwguerra):
+
+```bash
+# Se ainda nao adicionou o marketplace da mwguerra:
+/plugin marketplace add mwguerra/claude-code-plugins
+
+/plugin install docs-specialist@mwguerra-marketplace
+```
+
+## MCP essencial (nao e plugin, mas relacionado)
+
+### Playwright MCP
+
+O `advpl-specialist` tenta acessar a documentacao do TDN (TOTVS Developer Network) via `WebFetch` na API REST do Confluence. A TOTVS protege o TDN com Cloudflare managed challenge, que bloqueia ~80% das requisicoes `WebFetch`. Quando isso acontece, o plugin faz fallback automatico para **Playwright** — abre o TDN em um navegador real e extrai o conteudo via snapshot.
+
+Sem o Playwright MCP, os Tiers 3, 4 e 5 da skill [tdn-lookup](/docs/skills/tdn-lookup) nao funcionam, e consultas a funcoes nao catalogadas localmente falham silenciosamente.
+
+Instalacao:
+
+```bash
+claude mcp add playwright -- npx @anthropic-ai/mcp-playwright@latest
+```
+
+## Resumo visual
+
+Fluxo tipico de uma customizacao ADVPL grande com todos os plugins do combo:
+
+```
+prd-builder:prd
+    -> advpl-specialist:generate (consome PRD)
+       -> superpowers:verification-before-completion
+          -> advpl-specialist:test
+             -> superpowers:test-driven-development
+                -> commit + push
+
+Durante todo o fluxo: context-mode processa logs e arquivos grandes.
+Quando bater um erro: advpl-specialist:diagnose + superpowers:systematic-debugging + error-memory:log.
+Planos persistidos sao rastreados no taskmanager.
+```

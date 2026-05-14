@@ -1,0 +1,98 @@
+name: Collect Traffic Data
+
+on:
+  schedule:
+    # Roda diariamente as 23:50 UTC (20:50 BRT)
+    - cron: '50 23 * * *'
+  workflow_dispatch: # Permite execucao manual
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect and save traffic data
+        env:
+          GH_TOKEN: ${{ secrets.GIST_PAT }}
+          GIST_ID: 3b11d1d01d17c991dc0c187586264fff
+          REPO: thalysjuvenal/advpl-specialist
+        run: |
+          set -euo pipefail
+
+          TODAY=$(date -u +%Y-%m-%d)
+
+          # Coletar dados da API do GitHub
+          VIEWS=$(gh api "repos/${REPO}/traffic/views" 2>/dev/null || echo '{"count":0,"uniques":0,"views":[]}')
+          CLONES=$(gh api "repos/${REPO}/traffic/clones" 2>/dev/null || echo '{"count":0,"uniques":0,"clones":[]}')
+          REFERRERS=$(gh api "repos/${REPO}/traffic/popular/referrers" 2>/dev/null || echo '[]')
+          PATHS=$(gh api "repos/${REPO}/traffic/popular/paths" 2>/dev/null || echo '[]')
+          STARS=$(gh api "repos/${REPO}" --jq '.stargazers_count' 2>/dev/null || echo '0')
+          FORKS=$(gh api "repos/${REPO}" --jq '.forks_count' 2>/dev/null || echo '0')
+
+          # Extrair totais de 14 dias
+          VIEWS_TOTAL=$(echo "$VIEWS" | jq '.count')
+          VIEWS_UNIQUES=$(echo "$VIEWS" | jq '.uniques')
+          CLONES_TOTAL=$(echo "$CLONES" | jq '.count')
+          CLONES_UNIQUES=$(echo "$CLONES" | jq '.uniques')
+
+          # Extrair dados do dia atual (se disponivel)
+          VIEWS_TODAY=$(echo "$VIEWS" | jq --arg d "${TODAY}" '[.views[] | select(.timestamp | startswith($d))] | if length > 0 then .[0].count else 0 end')
+          VIEWS_TODAY_UNIQ=$(echo "$VIEWS" | jq --arg d "${TODAY}" '[.views[] | select(.timestamp | startswith($d))] | if length > 0 then .[0].uniques else 0 end')
+          CLONES_TODAY=$(echo "$CLONES" | jq --arg d "${TODAY}" '[.clones[] | select(.timestamp | startswith($d))] | if length > 0 then .[0].count else 0 end')
+          CLONES_TODAY_UNIQ=$(echo "$CLONES" | jq --arg d "${TODAY}" '[.clones[] | select(.timestamp | startswith($d))] | if length > 0 then .[0].uniques else 0 end')
+
+          # Montar snapshot do dia
+          SNAPSHOT=$(jq -n \
+            --arg date "$TODAY" \
+            --argjson views_14d "$VIEWS_TOTAL" \
+            --argjson views_14d_uniq "$VIEWS_UNIQUES" \
+            --argjson clones_14d "$CLONES_TOTAL" \
+            --argjson clones_14d_uniq "$CLONES_UNIQUES" \
+            --argjson views_today "$VIEWS_TODAY" \
+            --argjson views_today_uniq "$VIEWS_TODAY_UNIQ" \
+            --argjson clones_today "$CLONES_TODAY" \
+            --argjson clones_today_uniq "$CLONES_TODAY_UNIQ" \
+            --argjson stars "$STARS" \
+            --argjson forks "$FORKS" \
+            --argjson referrers "$REFERRERS" \
+            --argjson paths "$PATHS" \
+            '{
+              date: $date,
+              daily: {
+                views: $views_today,
+                views_unique: $views_today_uniq,
+                clones: $clones_today,
+                clones_unique: $clones_today_uniq
+              },
+              rolling_14d: {
+                views: $views_14d,
+                views_unique: $views_14d_uniq,
+                clones: $clones_14d,
+                clones_unique: $clones_14d_uniq
+              },
+              stars: $stars,
+              forks: $forks,
+              referrers: $referrers,
+              popular_paths: $paths
+            }')
+
+          # Baixar gist atual
+          gh gist view "$GIST_ID" --filename traffic-history.json --raw > /tmp/history.json 2>/dev/null || echo '{"snapshots":[]}' > /tmp/history.json
+
+          # Remover snapshot do mesmo dia (se rodar mais de uma vez)
+          UPDATED=$(jq --arg d "$TODAY" --argjson snap "$SNAPSHOT" '
+            .snapshots = ([.snapshots[] | select(.date != $d)] + [$snap] | sort_by(.date))
+          ' /tmp/history.json)
+
+          echo "$UPDATED" > /tmp/history.json
+
+          # Atualizar gist
+          gh gist edit "$GIST_ID" --filename traffic-history.json /tmp/history.json
+
+          # Resumo no log
+          echo "=== Traffic Snapshot: $TODAY ==="
+          echo "Views today: $VIEWS_TODAY ($VIEWS_TODAY_UNIQ unique)"
+          echo "Clones today: $CLONES_TODAY ($CLONES_TODAY_UNIQ unique)"
+          echo "Rolling 14d views: $VIEWS_TOTAL ($VIEWS_UNIQUES unique)"
+          echo "Rolling 14d clones: $CLONES_TOTAL ($CLONES_UNIQUES unique)"
+          echo "Stars: $STARS | Forks: $FORKS"
+          echo "Top referrer: $(echo "$REFERRERS" | jq -r 'if length > 0 then .[0].referrer else "none" end')"

@@ -1,0 +1,56 @@
+---
+title: TDN Lookup
+description: Estrategia de busca em 5 tiers — cache local por dominio, API REST do Confluence e fallbacks Playwright
+---
+
+# TDN Lookup — Cache Local + Busca Online
+
+Estrategia centralizada para resolver duvidas de documentacao Protheus. Comeca em **Tier 1 (cache local por dominio)** e escala para o TDN (TOTVS Developer Network) apenas quando necessario. Utilizada automaticamente por todos os agents que precisam consultar documentacao.
+
+## Quando e Usada
+
+- Para resolver PARAMIXB, retorno e rotina chamadora de pontos de entrada
+- Quando a referencia local nao cobre a funcao ou classe consultada
+- Para confirmar assinaturas de metodos nao documentados localmente
+- Para buscar documentacao de classes/funcoes de nicho
+
+## Tiers de Busca
+
+A busca comeca sempre no Tier 1 (cache local). So sobe para tiers online se o cache nao tiver a resposta:
+
+| Tier | Metodo | Descricao |
+|------|--------|-----------|
+| Tier 1 | Cache local por dominio | Consulta instantanea em arquivos versionados do plugin (PE, funcoes nativas, SX, erros, processos de negocio) — custo zero em tokens de rede |
+| Tier 2 | WebFetch API | Busca via API REST do Confluence (CQL query) — mais rapido e eficiente quando o cache nao tem a resposta |
+| Tier 3 | Playwright API JSON | Mesmo endpoint via Playwright (quando WebFetch falha por CORS/timeout) |
+| Tier 4a | WebSearch + Playwright | Busca via motor de busca + navegacao com Playwright |
+| Tier 4b | Playwright Visual | Navegacao direta no TDN com snapshot visual |
+
+### Mapeamento do Tier 1 (cache local)
+
+| Dominio | Arquivo de cache |
+|---------|------------------|
+| Pontos de entrada | `skills/advpl-code-generation/catalogo-top-50-pes.md` (20 PEs cobertos, meta 50) |
+| Funcoes nativas | `skills/protheus-reference/native-functions.md` |
+| Dicionario SX | `skills/protheus-reference/sx-dictionary.md` |
+| Campos SX3 comuns | `skills/protheus-reference/sx3-common-fields.md` |
+| Erros conhecidos | `skills/advpl-debugging/common-errors.md` |
+| Funcoes restritas | `skills/protheus-reference/restricted-functions.md` |
+| Processos de negocio | `skills/protheus-business/modulo-*.md` |
+
+## Consulta CQL
+
+A busca usa Confluence Query Language (CQL) para filtrar resultados:
+
+- **Busca exata:** `type=page AND title="{NOME}" AND space IN ("tec","framework")`
+- **Busca fuzzy:** `type=page AND text~"{NOME}"`
+
+## Dados Extraidos
+
+Apos encontrar a pagina no TDN, os seguintes dados sao extraidos:
+
+- Sintaxe e parametros da funcao/classe
+- Tipo de retorno e valores possiveis
+- Exemplos de uso
+- Observacoes e restricoes de versao
+- Para pontos de entrada: PARAMIXB (tipos, posicoes), retorno esperado, rotina chamadora
