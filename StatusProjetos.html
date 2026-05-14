@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status de Projetos - Protheus</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f9f8f7 0%, #faf9f8 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: #333;
+        }
+
+        .card-blue {
+            background: linear-gradient(145deg, #ffffff 0%, #dbeafe 40%, #bfdbfe 100%);
+            border: 1px solid #93c5fd;
+            border-radius: 12px;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.95),
+                inset 0 -2px 6px rgba(59,130,246,0.08),
+                0 6px 18px rgba(59,130,246,0.18),
+                0 2px 4px rgba(0,0,0,0.06);
+        }
+
+        .card-red {
+            background: linear-gradient(145deg, #ffffff 0%, #fee2e2 40%, #fecaca 100%);
+            border: 1px solid #fca5a5;
+            border-radius: 12px;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.95),
+                inset 0 -2px 6px rgba(239,68,68,0.08),
+                0 6px 18px rgba(239,68,68,0.18),
+                0 2px 4px rgba(0,0,0,0.06);
+        }
+
+        .card-amber {
+            background: linear-gradient(145deg, #ffffff 0%, #fef3c7 40%, #fde68a 100%);
+            border: 1px solid #fcd34d;
+            border-radius: 12px;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.95),
+                inset 0 -2px 6px rgba(245,158,11,0.08),
+                0 6px 18px rgba(245,158,11,0.18),
+                0 2px 4px rgba(0,0,0,0.06);
+        }
+
+        .card-green {
+            background: linear-gradient(145deg, #ffffff 0%, #dcfce7 40%, #bbf7d0 100%);
+            border: 1px solid #86efac;
+            border-radius: 12px;
+            box-shadow:
+                inset 0 1px 0 rgba(255,255,255,0.95),
+                inset 0 -2px 6px rgba(16,185,129,0.08),
+                0 6px 18px rgba(16,185,129,0.18),
+                0 2px 4px rgba(0,0,0,0.06);
+        }
+
+        .circulo-status {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 12px;
+            position: relative;
+            overflow: hidden;
+            box-shadow:
+                inset -5px -5px 10px rgba(0,0,0,0.35),
+                inset 3px 3px 8px rgba(255,255,255,0.2),
+                0 8px 20px rgba(0,0,0,0.25);
+        }
+
+        .circulo-status::after {
+            content: '';
+            position: absolute;
+            top: 10%;
+            left: 16%;
+            width: 42%;
+            height: 30%;
+            background: rgba(255,255,255,0.38);
+            border-radius: 50%;
+            transform: rotate(-30deg);
+            filter: blur(2px);
+        }
+
+        .print-header {
+            display: none;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+
+            body { background: white !important; margin-top: 0; }
+
+            .print-header {
+                display: flex !important;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                padding: 10px 32px;
+                border-bottom: 3px solid #3b82f6;
+                align-items: center;
+                gap: 16px;
+                z-index: 1000;
+            }
+
+            .print-content {
+                margin-top: 56px;
+            }
+
+            .print-section {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .card-blue, .card-red, .card-amber, .card-green,
+            .circulo-verde, .circulo-amarelo, .circulo-vermelho, .circulo-neutro {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+
+        .circulo-verde {
+            background: radial-gradient(circle at 35% 30%, #4ade80, #16a34a 55%, #14532d);
+        }
+
+        .circulo-amarelo {
+            background: radial-gradient(circle at 35% 30%, #fde047, #ca8a04 55%, #713f12);
+        }
+
+        .circulo-vermelho {
+            background: radial-gradient(circle at 35% 30%, #f87171, #dc2626 55%, #450a0a);
+        }
+
+        .circulo-neutro {
+            background: radial-gradient(circle at 35% 30%, #cbd5e1, #475569 55%, #1e293b);
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .spinner {
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        select, input[type="file"] {
+            padding: 12px 14px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 14px;
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        select:focus, input[type="file"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function StatusProjetos() {
+            const [arquivoCarregado, setArquivoCarregado] = useState(false);
+            const [projetos, setProjetos] = useState([]);
+            const [projetoSelecionado, setProjetoSelecionado] = useState(null);
+            const [mesAnoSelecionado, setMesAnoSelecionado] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [erro, setErro] = useState('');
+            const [mesesUnicos, setMesesUnicos] = useState([]);
+
+            const handleFileUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                setLoading(true);
+                setErro('');
+
+                try {
+                    const data = await file.arrayBuffer();
+                    const workbook = XLSX.read(data, { defval: "" });
+                    const worksheetData = workbook.Sheets[workbook.SheetNames[0]];
+                    
+                    if (!worksheetData) {
+                        throw new Error('Nenhuma aba encontrada na planilha');
+                    }
+
+                    const rawData = XLSX.utils.sheet_to_json(worksheetData, { header: "A", defval: "" });
+                    const headers = rawData[1]; // Linha 2 tem os headers reais
+                    const dados = rawData.slice(2).filter(row => row.A); // Dados começam na linha 3
+
+                    console.log("Headers:", headers);
+                    console.log("Primeiro dado:", dados[0]);
+
+                    const serialParaMesAno = (val) => {
+                        if (!val && val !== 0) return '';
+                        const num = Number(val);
+                        if (!isNaN(num) && num > 25000) {
+                            const date = new Date(Date.UTC(0, 0, num - 1));
+                            const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+                            const yyyy = date.getUTCFullYear();
+                            return `${mm}/${yyyy}`;
+                        }
+                        return String(val);
+                    };
+
+                    const projetosCarregados = dados.map((row, idx) => {
+                        const obj = {};
+                        Object.keys(headers).forEach(colKey => {
+                            const headerName = headers[colKey];
+                            obj[headerName] = row[colKey] || '';
+                        });
+                        obj['MÊS/ANO STATUS REPORT'] = serialParaMesAno(obj['MÊS/ANO STATUS REPORT']);
+                        return obj;
+                    });
+
+                    const projetosFiltrados = projetosCarregados.filter(p => p['CÓDIGO PROJETO']);
+
+                    if (projetosFiltrados.length === 0) {
+                        throw new Error('Nenhum projeto encontrado na planilha');
+                    }
+
+                    setProjetos(projetosFiltrados);
+                    setArquivoCarregado(true);
+
+                    const meses = [...new Set(projetosFiltrados.map(p => String(p['MÊS/ANO STATUS REPORT'])).filter(m => m))];
+                    setMesesUnicos(meses.sort());
+
+                    if (meses.length > 0) {
+                        setMesAnoSelecionado(meses[0]);
+                        const primeiroProjeto = projetosFiltrados.filter(p => String(p['MÊS/ANO STATUS REPORT']) === meses[0])[0];
+                        setProjetoSelecionado(primeiroProjeto);
+                    }
+
+                } catch (err) {
+                    setErro(`Erro ao carregar arquivo: ${err.message}`);
+                    console.error(err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const getCampo = (chave, padrao = 'N/A') => {
+                if (!projetoSelecionado) return padrao;
+                const valor = projetoSelecionado[chave];
+                return (valor !== undefined && valor !== '' && valor !== null) ? String(valor) : padrao;
+            };
+
+            const formatData = (data) => {
+                if (!data || data === 'N/A') return 'N/A';
+                if (typeof data === 'number' || (typeof data === 'string' && !isNaN(Number(data)) && Number(data) > 25000)) {
+                    const serial = typeof data === 'number' ? data : Number(data);
+                    const date = new Date(Date.UTC(0, 0, serial - 1));
+                    return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                }
+                if (data instanceof Date) {
+                    return data.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+                }
+                return String(data);
+            };
+
+            const formatMargem = (campo) => {
+                const val = getCampo(campo, '');
+                if (!val || val === 'N/A' || val === '') return 'N/A';
+                const num = parseFloat(String(val).replace(',', '.'));
+                if (isNaN(num)) return val;
+                // Valores entre -1 e 1 estão em formato decimal do Excel (0.18 = 18%)
+                const pct = (Math.abs(num) <= 1) ? num * 100 : num;
+                return pct.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '%';
+            };
+
+            const formatNum = (n) => {
+                if (!n && n !== 0) return '0';
+                const num = parseFloat(String(n).replace(',', '.'));
+                if (isNaN(num)) return String(n);
+                return num.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+            };
+
+            const calcularPercentualConsumido = () => {
+                const vendidas = parseFloat(String(getCampo('HORAS VENDIDAS', 0)).replace(',', '.')) || 0;
+                const consumidas = parseFloat(String(getCampo('HORAS CONSUMIDAS', 0)).replace(',', '.')) || 0;
+                if (vendidas === 0) return '0,00%';
+                const resultado = (consumidas / vendidas) * 100;
+                return resultado.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '%';
+            };
+
+            const calcularPercentualProgresso = () => {
+                let progresso = getCampo('% PROGRESSO FÍSICO', '0');
+                const num = parseFloat(String(progresso).replace(',', '.')) || 0;
+                // Valores >= 1 são tratados como percentual direto (ex: 75 = 75%)
+                // Valores entre 0 e 1 são tratados como decimal do Excel (ex: 0.75 = 75%)
+                const pct = (num > 0 && num < 1) ? num * 100 : num;
+                const capped = Math.min(pct, 100);
+                return capped.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '%';
+            };
+
+            const getSemaforoSaude = (saude) => {
+                if (!saude || saude === 'N/A') return 'neutro';
+                const s = String(saude).toUpperCase();
+                if (s.includes('VERDE')) return 'verde';
+                if (s.includes('AMARELO')) return 'amarelo';
+                if (s.includes('VERMELHO')) return 'vermelho';
+                return 'neutro';
+            };
+
+            const getSemaforoRisco = (risco) => {
+                if (!risco || risco === 'N/A') return 'neutro';
+                const s = String(risco).toUpperCase();
+                if (s.includes('BAIXO')) return 'verde';
+                if (s.includes('MÉDIO') || s.includes('MODERADO')) return 'amarelo';
+                if (s.includes('ALTO')) return 'vermelho';
+                return 'neutro';
+            };
+
+            if (!arquivoCarregado) {
+                return (
+                    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+                        <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '40px', maxWidth: '600px', width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                            <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1f2937', margin: '0 0 12px 0' }}>Status de Projetos</h1>
+                            <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 32px 0' }}>Gerenciador de Status - Protheus</p>
+
+                            <div style={{ marginBottom: '24px' }}>
+                                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
+                                    📁 Selecione seu arquivo Excel (.xlsx)
+                                </label>
+                                <input 
+                                    type="file" 
+                                    accept=".xlsx,.xls" 
+                                    onChange={handleFileUpload}
+                                    disabled={loading}
+                                    style={{ width: '100%', cursor: loading ? 'not-allowed' : 'pointer' }}
+                                />
+                            </div>
+
+                            {erro && (
+                                <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '10px', padding: '16px', color: '#991b1b', fontSize: '14px', marginBottom: '24px' }}>
+                                    ⚠️ {erro}
+                                </div>
+                            )}
+
+                            {loading && (
+                                <div style={{ textAlign: 'center', padding: '32px' }}>
+                                    <div className="spinner" style={{ margin: '0 auto 16px' }}></div>
+                                    <p style={{ color: '#6b7280' }}>Carregando arquivo...</p>
+                                </div>
+                            )}
+
+                            {!loading && (
+                                <div style={{ background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '10px', padding: '16px' }}>
+                                    <p style={{ fontSize: '12px', fontWeight: '600', color: '#374151', margin: '0 0 8px 0' }}>ℹ️ Como usar:</p>
+                                    <ol style={{ fontSize: '13px', color: '#6b7280', margin: '0', paddingLeft: '20px', lineHeight: '1.6' }}>
+                                        <li>Preencha a planilha Excel com seus dados</li>
+                                        <li>Salve como .xlsx</li>
+                                        <li>Clique em "Selecione seu arquivo"</li>
+                                        <li>Os dados vão aparecer automaticamente</li>
+                                    </ol>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!projetoSelecionado) {
+                return (
+                    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <p style={{ color: '#6b7280', marginBottom: '16px' }}>Nenhum projeto encontrado</p>
+                            <button
+                                onClick={() => { setArquivoCarregado(false); setProjetos([]); setProjetoSelecionado(null); setMesAnoSelecionado(null); setMesesUnicos([]); }}
+                                style={{ background: '#3b82f6', color: 'white', padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                            >
+                                Carregar outro arquivo
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            const projetosFiltrados = mesAnoSelecionado
+                ? projetos.filter(p => String(p['MÊS/ANO STATUS REPORT']) === String(mesAnoSelecionado))
+                : projetos;
+
+            const saude = getCampo('STATUS DE SAÚDE', 'N/A');
+            const risco = getCampo('NÍVEL RISCO', 'N/A');
+            const semaforoSaude = getSemaforoSaude(saude);
+            const semaforoRisco = getSemaforoRisco(risco);
+
+            return (
+                <div style={{ padding: '32px', minHeight: '100vh' }}>
+                    {/* CABEÇALHO REPETIDO NA IMPRESSÃO */}
+                    <div className="print-header">
+                        <span style={{ fontWeight: '800', fontSize: '14px', color: '#1f2937' }}>Status Report Projetos</span>
+                        <span style={{ color: '#d1d5db' }}>|</span>
+                        <span style={{ fontWeight: '600', fontSize: '13px', color: '#374151' }}>{getCampo('RAZÃO SOCIAL CLIENTE')}</span>
+                        <span style={{ color: '#d1d5db' }}>|</span>
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>{getCampo('CÓDIGO PROJETO')} — {mesAnoSelecionado}</span>
+                    </div>
+
+                    <div className="print-content" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+                        {/* TÍTULO DA PÁGINA */}
+                        <div style={{ marginBottom: '28px' }}>
+                            <h1 style={{ fontSize: '32px', fontWeight: '800', color: '#1f2937', margin: '0 0 4px 0', letterSpacing: '-0.5px' }}>
+                                Status Report Projetos
+                            </h1>
+                            <div style={{ width: '60px', height: '4px', background: 'linear-gradient(90deg, #3b82f6, #6366f1)', borderRadius: '2px' }}></div>
+                        </div>
+
+                        {/* HEADER COM SELETORES */}
+                        <div className="no-print" style={{ display: 'flex', gap: '24px', marginBottom: '32px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                            <div style={{ flex: 1, minWidth: '200px' }}>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                                    Mês/Ano Status Report
+                                </label>
+                                <select
+                                    value={mesAnoSelecionado || ''}
+                                    onChange={(e) => {
+                                        const novoMes = e.target.value;
+                                        setMesAnoSelecionado(novoMes);
+                                        const proj = projetos.find(p => String(p['MÊS/ANO STATUS REPORT']) === novoMes);
+                                        setProjetoSelecionado(proj || null);
+                                    }}
+                                    style={{ width: '100%' }}
+                                >
+                                    {mesesUnicos.map(mes => <option key={mes} value={mes}>{mes}</option>)}
+                                </select>
+                            </div>
+
+                            <div style={{ flex: 2, minWidth: '300px' }}>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                                    Selecione o Projeto
+                                </label>
+                                <select 
+                                    value={projetosFiltrados.indexOf(projetoSelecionado)} 
+                                    onChange={(e) => setProjetoSelecionado(projetosFiltrados[e.target.value])}
+                                    style={{ width: '100%' }}
+                                >
+                                    {projetosFiltrados.map((proj, idx) => {
+                                        const codigo = proj['CÓDIGO PROJETO'] || `Projeto ${idx + 1}`;
+                                        const nome = proj['NOME DO PROJETO SISTEMA'] || '';
+                                        return (
+                                            <option key={idx} value={idx}>
+                                                {codigo} - {nome}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+
+                            <button
+                                onClick={() => window.print()}
+                                style={{ background: '#3b82f6', color: 'white', padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}
+                            >
+                                🖨️ Imprimir / PDF
+                            </button>
+
+                            <button
+                                onClick={() => { setArquivoCarregado(false); setProjetos([]); setProjetoSelecionado(null); setMesAnoSelecionado(null); setMesesUnicos([]); }}
+                                style={{ background: '#ef4444', color: 'white', padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}
+                            >
+                                Carregar outro arquivo
+                            </button>
+                        </div>
+
+                        {/* QUADRO IDENTIFICAÇÃO */}
+                        <div className="fade-in print-section" style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '14px', padding: '32px', marginBottom: '32px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '32px' }}>
+                            <div style={{ flex: 1, minWidth: '400px' }}>
+                                <p style={{ fontSize: '11px', color: '#999', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 6px 0', fontWeight: '600' }}>Cliente</p>
+                                <h2 style={{ fontSize: '28px', fontWeight: '700', color: '#1f2937', margin: '0 0 24px 0' }}>{getCampo('RAZÃO SOCIAL CLIENTE')}</h2>
+                                
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+                                    <div>
+                                        <p style={{ fontSize: '11px', color: '#999', margin: '0 0 6px 0', fontWeight: '600' }}>MODALIDADE PROJETO</p>
+                                        <p style={{ fontSize: '15px', fontWeight: '600', color: '#1f2937', margin: '0' }}>{getCampo('MODALIDADE PROJETO')}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ fontSize: '11px', color: '#999', margin: '0 0 6px 0', fontWeight: '600' }}>DATA INÍCIO PLANEJADO</p>
+                                        <p style={{ fontSize: '15px', fontWeight: '600', color: '#1f2937', margin: '0' }}>{formatData(getCampo('DATA INÍCIO PLANEJADO'))}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ fontSize: '11px', color: '#999', margin: '0 0 6px 0', fontWeight: '600' }}>DATA GO LIVE PLANEJADO</p>
+                                        <p style={{ fontSize: '15px', fontWeight: '600', color: '#1f2937', margin: '0' }}>{formatData(getCampo('DATA GO LIVE PLANEJADO'))}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ fontSize: '11px', color: '#999', margin: '0 0 6px 0', fontWeight: '600' }}>DATA GO LIVE ESTIMADO</p>
+                                        <p style={{ fontSize: '15px', fontWeight: '600', color: '#1f2937', margin: '0' }}>{formatData(getCampo('DATA GO LIVE ESTIMADO'))}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '48px', alignItems: 'flex-start' }}>
+                                {/* CÍRCULO STATUS DE SAÚDE */}
+                                <div style={{ textAlign: 'center' }}>
+                                    <div className={`circulo-status circulo-${semaforoSaude}`}></div>
+                                    <p style={{ fontSize: '11px', color: '#999', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 4px 0', fontWeight: '700' }}>STATUS DE SAÚDE</p>
+                                    <p style={{ fontSize: '15px', fontWeight: '700', margin: '0', color: semaforoSaude === 'verde' ? '#16a34a' : semaforoSaude === 'amarelo' ? '#ca8a04' : semaforoSaude === 'vermelho' ? '#dc2626' : '#64748b' }}>{saude}</p>
+                                </div>
+
+                                {/* CÍRCULO NÍVEL RISCO */}
+                                <div style={{ textAlign: 'center' }}>
+                                    <div className={`circulo-status circulo-${semaforoRisco}`}></div>
+                                    <p style={{ fontSize: '11px', color: '#999', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 4px 0', fontWeight: '700' }}>NÍVEL RISCO</p>
+                                    <p style={{ fontSize: '15px', fontWeight: '700', margin: '0', color: semaforoRisco === 'verde' ? '#16a34a' : semaforoRisco === 'amarelo' ? '#ca8a04' : semaforoRisco === 'vermelho' ? '#dc2626' : '#64748b' }}>{risco}</p>
+                                </div>
+
+                                {/* CÍRCULO PROJETO ATRASADO */}
+                                <div style={{ textAlign: 'center' }}>
+                                    {(() => {
+                                        const atrasado = getCampo('PROJETO ATRASADO?');
+                                        const cor = atrasado === 'SIM' ? 'circulo-vermelho' : atrasado === 'NÃO' ? 'circulo-verde' : 'circulo-neutro';
+                                        const corTexto = atrasado === 'SIM' ? '#dc2626' : atrasado === 'NÃO' ? '#16a34a' : '#64748b';
+                                        return (
+                                            <>
+                                                <div className={`circulo-status ${cor}`}></div>
+                                                <p style={{ fontSize: '11px', color: '#999', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 4px 0', fontWeight: '700' }}>PROJETO ATRASADO?</p>
+                                                <p style={{ fontSize: '15px', fontWeight: '700', margin: '0', color: corTexto }}>{atrasado}</p>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CARDS KPIs */}
+                        <div className="print-section" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                            <div className="card-blue" style={{ padding: '20px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '600', margin: '0 0 10px 0', textTransform: 'uppercase', color: '#1e40af' }}>HORAS VENDIDAS</p>
+                                <p style={{ fontSize: '32px', fontWeight: '700', margin: '0', color: '#1e3a8a' }}>{formatNum(getCampo('HORAS VENDIDAS'))}</p>
+                                <p style={{ fontSize: '12px', color: '#3b82f6', margin: '8px 0 0 0', fontWeight: '500' }}>📊 Capacidade</p>
+                            </div>
+
+                            <div className="card-red" style={{ padding: '20px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '600', margin: '0 0 10px 0', textTransform: 'uppercase', color: '#991b1b' }}>HORAS CONSUMIDAS</p>
+                                <p style={{ fontSize: '32px', fontWeight: '700', margin: '0', color: '#7f1d1d' }}>{formatNum(getCampo('HORAS CONSUMIDAS'))}</p>
+                                <p style={{ fontSize: '12px', color: '#ef4444', margin: '8px 0 0 0', fontWeight: '500' }}>⚡ Realizado</p>
+                            </div>
+
+                            <div className="card-amber" style={{ padding: '20px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '600', margin: '0 0 10px 0', textTransform: 'uppercase', color: '#92400e' }}>HORAS PLANEJADAS ESTIMADAS PARA TÉRMINO</p>
+                                <p style={{ fontSize: '32px', fontWeight: '700', margin: '0', color: '#78350f' }}>{formatNum(getCampo('HORAS PLANEJADAS ESTIMADAS PARA TÉRMINO'))}</p>
+                                <p style={{ fontSize: '12px', color: '#f59e0b', margin: '8px 0 0 0', fontWeight: '500' }}>📅 Estimado</p>
+                            </div>
+
+                            <div className="card-blue" style={{ padding: '20px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '600', margin: '0 0 10px 0', textTransform: 'uppercase', color: '#1e40af' }}>% CONSUMIDO FUNCIONAL</p>
+                                <p style={{ fontSize: '32px', fontWeight: '700', margin: '0', color: '#1e3a8a' }}>{calcularPercentualConsumido()}</p>
+                                <p style={{ fontSize: '12px', color: '#3b82f6', margin: '8px 0 0 0', fontWeight: '500' }}>📊 Uso</p>
+                            </div>
+
+                            <div className="card-green" style={{ padding: '20px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '600', margin: '0 0 10px 0', textTransform: 'uppercase', color: '#166534' }}>% PROGRESSO FÍSICO</p>
+                                <p style={{ fontSize: '32px', fontWeight: '700', margin: '0', color: '#15803d' }}>{calcularPercentualProgresso()}</p>
+                                <p style={{ fontSize: '12px', color: '#10b981', margin: '8px 0 0 0', fontWeight: '500' }}>✓ Avanço</p>
+                            </div>
+
+                            {(() => {
+                                const saldo = parseFloat(String(getCampo('SALDO DE HORAS', '0')).replace(',', '.')) || 0;
+                                const cardClass = saldo >= 0 ? 'card-green' : 'card-red';
+                                const corLabel = saldo >= 0 ? '#166534' : '#991b1b';
+                                const corValor = saldo >= 0 ? '#15803d' : '#7f1d1d';
+                                const corSub = saldo >= 0 ? '#10b981' : '#ef4444';
+                                const icone = saldo >= 0 ? '✓ Positivo' : '💔 Negativo';
+                                return (
+                                    <div className={cardClass} style={{ padding: '20px', textAlign: 'center' }}>
+                                        <p style={{ fontSize: '11px', fontWeight: '600', margin: '0 0 10px 0', textTransform: 'uppercase', color: corLabel }}>SALDO DE HORAS</p>
+                                        <p style={{ fontSize: '32px', fontWeight: '700', margin: '0', color: corValor }}>{formatNum(getCampo('SALDO DE HORAS'))}</p>
+                                        <p style={{ fontSize: '12px', color: corSub, margin: '8px 0 0 0', fontWeight: '500' }}>{icone}</p>
+                                    </div>
+                                );
+                            })()}
+
+                            <div className="card-green" style={{ padding: '20px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '600', margin: '0 0 10px 0', textTransform: 'uppercase', color: '#166534' }}>HORAS APORTE</p>
+                                <p style={{ fontSize: '32px', fontWeight: '700', margin: '0', color: '#15803d' }}>{formatNum(getCampo('HORAS APORTE'))}</p>
+                                <p style={{ fontSize: '12px', color: '#10b981', margin: '8px 0 0 0', fontWeight: '500' }}>🎁 Adicional</p>
+                            </div>
+
+                            <div className="card-amber" style={{ padding: '20px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '10px', fontWeight: '600', margin: '0 0 8px 0', textTransform: 'uppercase', color: '#92400e' }}>MARGEM VENDIDA (%)</p>
+                                <p style={{ fontSize: '28px', fontWeight: '700', margin: '0 0 8px 0', color: '#78350f' }}>{formatMargem('MARGEM VENDIDA (%)')}</p>
+                                <p style={{ fontSize: '10px', fontWeight: '600', margin: '0 0 6px 0', textTransform: 'uppercase', color: '#92400e' }}>MARGEM DESEJADA (%)</p>
+                                <p style={{ fontSize: '20px', fontWeight: '600', margin: '0', color: '#78350f' }}>{formatMargem('MARGEM DESEJADA (%)')}</p>
+                            </div>
+
+                            <div className="card-green" style={{ padding: '20px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '600', margin: '0 0 10px 0', textTransform: 'uppercase', color: '#166534' }}>MITS CONCLUÍDAS</p>
+                                <p style={{ fontSize: '32px', fontWeight: '700', margin: '0', color: '#15803d' }}>{getCampo('MITS CONCLUÍDAS')}</p>
+                                <p style={{ fontSize: '12px', color: '#10b981', margin: '8px 0 0 0', fontWeight: '500' }}>✓ Documentação</p>
+                            </div>
+
+                            <div className="card-red" style={{ padding: '20px', textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '600', margin: '0 0 10px 0', textTransform: 'uppercase', color: '#991b1b' }}>MITS PENDENTES</p>
+                                <p style={{ fontSize: '32px', fontWeight: '700', margin: '0', color: '#7f1d1d' }}>{getCampo('MITS PENDENTES')}</p>
+                                <p style={{ fontSize: '12px', color: '#ef4444', margin: '8px 0 0 0', fontWeight: '500' }}>⏳ Faltando</p>
+                            </div>
+                        </div>
+
+                        {/* BLOQUEADOR */}
+                        {getCampo('TEM BLOQUEADOR ATIVO?') === 'SIM' ? (
+                            <div className="print-section" style={{ background: 'rgba(255, 245, 245, 0.7)', border: '1px solid #ffe0e0', borderLeft: '4px solid #ef4444', borderRadius: '0 12px 12px 0', padding: '24px', marginBottom: '24px', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)' }}>
+                                <p style={{ fontSize: '12px', color: '#c91414', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '700', margin: '0 0 14px 0' }}>🚨 TEM BLOQUEADOR ATIVO?</p>
+                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '24px' }}>
+                                    <div>
+                                        <p style={{ fontSize: '11px', color: '#999', margin: '0 0 6px 0', fontWeight: '600' }}>DESCRIÇÃO DO BLOQUEADOR</p>
+                                        <p style={{ fontSize: '14px', color: '#333', margin: '0', lineHeight: '1.5' }}>{getCampo('DESCRIÇÃO DO BLOQUEADOR')}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ fontSize: '11px', color: '#999', margin: '0 0 6px 0', fontWeight: '600' }}>RESPONSÁVEL PELA RESOLUÇÃO</p>
+                                        <p style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: '0' }}>{getCampo('RESPONSÁVEL PELA RESOLUÇÃO')}</p>
+                                    </div>
+                                    <div>
+                                        <p style={{ fontSize: '11px', color: '#999', margin: '0 0 6px 0', fontWeight: '600' }}>DATA PREVISTA PARA RESOLVER</p>
+                                        <p style={{ fontSize: '14px', fontWeight: '600', color: '#333', margin: '0' }}>{formatData(getCampo('DATA PREVISTA PARA RESOLVER'))}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="print-section" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderLeft: '4px solid #10b981', borderRadius: '0 12px 12px 0', padding: '24px', marginBottom: '24px' }}>
+                                <p style={{ fontSize: '12px', color: '#166534', fontWeight: '700', margin: '0 0 8px 0' }}>✓ Sem Bloqueadores</p>
+                                <p style={{ fontSize: '14px', color: '#15803d', margin: '0' }}>Projeto sem impedimentos conhecidos</p>
+                            </div>
+                        )}
+
+                        {/* ESCOPO */}
+                        <div className="print-section" style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '24px', marginBottom: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                            <p style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '700', margin: '0 0 14px 0' }}>ESCOPO & DIVERGÊNCIAS</p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+                                <div>
+                                    <p style={{ fontSize: '11px', color: '#999', margin: '0 0 6px 0', fontWeight: '600' }}>ESCOPO VENDIDO</p>
+                                    <p style={{ fontSize: '14px', color: '#333', margin: '0', lineHeight: '1.6' }}>{getCampo('ESCOPO VENDIDO')}</p>
+                                </div>
+                                <div>
+                                    <p style={{ fontSize: '11px', color: '#999', margin: '0 0 6px 0', fontWeight: '600' }}>DIVERGÊNCIA ESCOPO?</p>
+                                    {(() => {
+                                        const div = getCampo('DIVERGÊNCIA ESCOPO?');
+                                        const cor = div === 'SIM' ? '#ef4444' : div === 'NÃO' ? '#10b981' : '#94a3b8';
+                                        const label = div === 'SIM' ? '❌ SIM' : div === 'NÃO' ? '✓ NÃO' : div;
+                                        return (
+                                            <>
+                                                <p style={{ fontSize: '14px', fontWeight: '600', color: cor, margin: '0' }}>{label}</p>
+                                                {div === 'SIM' && (
+                                                    <p style={{ fontSize: '12px', color: '#333', margin: '8px 0 0 0' }}>{getCampo('DESCRIÇÃO DIVERGÊNCIA')}</p>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* OBSERVAÇÕES */}
+                        <div className="print-section" style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '24px', marginBottom: '32px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                            <p style={{ fontSize: '12px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '700', margin: '0 0 14px 0' }}>OBSERVAÇÕES GERAIS</p>
+                            <p style={{ fontSize: '14px', lineHeight: '1.8', color: '#444', margin: '0', textAlign: 'justify' }}>
+                                {getCampo('OBSERVAÇÕES GERAIS', '') || 'Sem observações adicionais'}
+                            </p>
+                        </div>
+                    </div>{/* fim print-content */}
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<StatusProjetos />);
+    </script>
+</body>
+</html>
