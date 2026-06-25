@@ -1,4 +1,4 @@
-﻿{
+{
   "version": "1.0.0",
   "categories": {
     "spec-driven-development": {
@@ -35,6 +35,22 @@
     }
   },
   "skills": [
+    {
+      "name": "protheus-consultant",
+      "description": "Atua como Consultor e Analista Sênior TOTVS Protheus (N3) para atendimento de chamados, diagnóstico de erros sistêmicos, integrações, parametrização, análise de banco e desenvolvimento ADVPL/TLPP. Use SEMPRE que o usuário mencionar Protheus, TOTVS, ADVPL, TLPP, ExecAuto, Ponto de Entrada, qualquer módulo SIGA*, tabelas SA1/SC5/SE1, parâmetros MV_*, rotinas FINAxxx/MATAxxx/CTBAxxx, erros de AppServer/DBAccess/SmartClient/TSS, ou descrever chamado/log com erro de ERP.",
+      "category": "consulting",
+      "path": "advpl-tlpp/protheus-consultant",
+      "files": [
+        "SKILL.md",
+        "references/parametros-protheus-completo.md",
+        "references/parametros-comuns.md",
+        "references/rotinas-e-erros.md",
+        "references/tabelas-comuns.md",
+        "references/tabelas-protheus-completo.md"
+      ],
+      "author": "barbafuture",
+      "version": "1.0.0"
+    },
     {
       "name": "advpl-tlpp-sdd",
       "description": "Plan and implement Protheus projects/features with 4 adaptive phases — Specify, Design, Tasks, Execute. Auto-sizes depth based on complexity. Creates atomic tasks with verification criteria, atomic commits, requirement traceability, and persistent memory across sessions. Specific to AdvPL/TLPP + Protheus. Use when: (1) Starting new Protheus projects, (2) Working on existing codebases (map modules, architecture, conventions), (3) Planning features (requirements, design, task breakdown), (4) Implementing with verification and atomic commits, (5) Quick tasks (bug fixes, entry points, config), (6) Tracking decisions/blockers/ideas across sessions, (7) Pausing/resuming work. Triggers on: 'initialize project', 'map codebase', 'specify feature', 'discuss feature', 'design', 'tasks', 'implement', 'validate', 'verify work', 'quick fix', 'pause work', 'resume work'.",
